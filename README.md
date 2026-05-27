@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](#requirements)
 [![WhisperX](https://img.shields.io/badge/whisperx-3.8%2B-brightgreen.svg)](#requirements)
-[![License](https://img.shields.io/badge/license-TBD-lightgrey.svg)](#license)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 
 Audio transcription and speaker diarization using [WhisperX](https://github.com/m-bain/whisperX), Hugging Face diarization models, and ffmpeg.
 
@@ -206,4 +206,4 @@ COMPUTE_TYPE = "int8"
 
 ## License
 
-TBD. Add a license before publishing or sharing the repository publicly.
+MIT License — see [LICENSE](LICENSE) for details.
