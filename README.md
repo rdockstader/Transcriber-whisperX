@@ -18,7 +18,7 @@ Audio transcription and speaker diarization using [WhisperX](https://github.com/
 
 ```bash
 # 1. Clone the repository
-git clone [<your-repo-url>](https://github.com/rdockstader/Transcriber-whisperX)
+git clone https://github.com/rdockstader/Transcriber-whisperX
 cd transcriber-whisperx
 
 # 2. Create and activate a virtual environment (Python 3.10–3.13)
