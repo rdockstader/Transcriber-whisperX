@@ -53,8 +53,8 @@ Recommended dependency pins:
 
 ```txt
 whisperx==3.2.0
-torch==2.1.2
-torchaudio==2.1.2
+torch==2.2.2
+torchaudio==2.2.2
 faster-whisper==1.0.0
 ctranslate2==4.4.0
 ```
