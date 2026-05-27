@@ -1,0 +1,25 @@
+# Local secrets
+.env
+
+# Local environments
+.venv/
+venv/
+env/
+
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# Local audio inputs and generated transcripts
+input/
+output/
