@@ -14,7 +14,7 @@ Audio transcription and speaker diarization using [WhisperX](https://github.com/
 - Performs speaker diarization
 - Prints readable speaker-labeled transcript output
 - Uses `HF_TOKEN` from environment variables
-- Supports Apple Silicon via PyTorch MPS with CPU fallback options
+- Supports Apple Silicon using CPU execution for WhisperX compatibility
 
 ## Quick Start
 
@@ -58,6 +58,7 @@ torch==2.2.2
 torchaudio==2.2.2
 faster-whisper==1.0.0
 ctranslate2==4.4.0
+numpy<2
 ```
 
 ## macOS Apple Silicon Setup
@@ -104,8 +105,8 @@ Speaker diarization requires authenticated access to gated Hugging Face models.
 1. Create or sign in to a Hugging Face account.
 2. Create an access token at `https://huggingface.co/settings/tokens`.
 3. Accept the gated model terms for the diarization models used by WhisperX, commonly:
-   - `pyannote/speaker-diarization`
-   - `pyannote/segmentation`
+   - `pyannote/speaker-diarization-3.1`
+   - `pyannote/segmentation-3.0`
 4. Copy the example environment file and add your token:
 
 ```bash
@@ -144,12 +145,15 @@ Each audio file gets its own output directory based on the file name:
 ```text
 output/
 └── Recording 14/
+    ├── Recording 14.mp3
     ├── Recording 14.txt
     ├── Recording 14.json
     ├── Recording 14.srt
     ├── Recording 14.tsv
     └── Recording 14.vtt
 ```
+
+After a successful run, the original audio file is copied into its output folder. Future runs skip input files that already have their source audio copied there, so completed files are not processed twice and the original input file is left untouched.
 
 Example output:
 
@@ -206,6 +210,27 @@ Then reinstall the project requirements:
 pip install -r requirements.txt
 ```
 
+### NumPy 2 compatibility errors
+
+If startup fails with an error like:
+
+```text
+AttributeError: `np.NaN` was removed in the NumPy 2.0 release
+```
+
+or:
+
+```text
+A module that was compiled using NumPy 1.x cannot be run in NumPy 2.x
+```
+
+downgrade NumPy inside the virtual environment:
+
+```bash
+python -m pip install "numpy<2"
+python -m pip install -r requirements.txt
+```
+
 ### Missing ffmpeg
 
 If transcription fails with an ffmpeg-related error, install ffmpeg:
@@ -236,38 +261,62 @@ brew install pkg-config ffmpeg
 python -m pip install -r requirements.txt
 ```
 
+If `av==11.*` fails with an error like:
+
+```text
+use of undeclared identifier 'AV_OPT_TYPE_CHANNEL_LAYOUT'
+```
+
+you are likely building PyAV 11 against a newer FFmpeg release. Install an older Homebrew FFmpeg formula and point `pkg-config` at it while installing:
+
+```bash
+brew install ffmpeg@6 pkg-config
+export PKG_CONFIG_PATH="$(brew --prefix ffmpeg@6)/lib/pkgconfig"
+python -m pip install --no-cache-dir --force-reinstall "av==11.0.0"
+python -m pip install -r requirements.txt
+```
+
+If `ffmpeg@6` is not available from Homebrew, the most reliable fallback is to recreate the project environment with Python 3.11 and reinstall the requirements.
+
 ### Hugging Face gated repo access errors
 
 Common symptoms include `401 Unauthorized`, `403 Forbidden`, or messages saying access to a gated repo is restricted.
+
+WhisperX currently tries to download:
+
+```text
+pyannote/speaker-diarization-3.1
+```
 
 Fix checklist:
 
 - Confirm `HF_TOKEN` is exported in the same terminal session.
 - Confirm the token has read access.
-- Accept the model terms on Hugging Face while signed in.
+- Accept the model terms on Hugging Face while signed in:
+  - `https://huggingface.co/pyannote/speaker-diarization-3.1`
+  - `https://huggingface.co/pyannote/segmentation-3.0`
 - Retry after a few minutes if access was just approved.
 
 ```bash
-echo $HF_TOKEN
+python -c "import os; from dotenv import load_dotenv; load_dotenv(); print('HF_TOKEN set:', bool(os.getenv('HF_TOKEN')))"
 ```
 
-### Apple Silicon device issues
+### Unsupported device mps
 
-The script currently uses:
+If startup fails with:
+
+```text
+ValueError: unsupported device mps
+```
+
+use CPU mode. `faster-whisper` runs through `ctranslate2`, which does not support the `mps` device.
+
+The script currently defaults to:
 
 ```python
-device = "mps"
+DEVICE = "cpu"
 compute_type = "int8"
 ```
-
-If you encounter MPS-related runtime errors, try CPU mode:
-
-```python
-device = "cpu"
-compute_type = "int8"
-```
-
-CPU mode is slower, but it is useful for debugging dependency or hardware acceleration issues.
 
 ## Roadmap
 

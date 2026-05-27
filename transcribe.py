@@ -1,9 +1,12 @@
 import json
 import os
+import shutil
 from pathlib import Path
 
 import whisperx
 from dotenv import load_dotenv
+from huggingface_hub import hf_hub_download
+from huggingface_hub.utils import HfHubHTTPError
 
 
 load_dotenv()
@@ -11,7 +14,7 @@ load_dotenv()
 INPUT_DIR = Path("input")
 OUTPUT_DIR = Path("output")
 MODEL_SIZE = "medium"
-DEVICE = "mps"  # Use "cpu" if MPS causes issues.
+DEVICE = "cpu"  # ctranslate2/faster-whisper does not support "mps".
 COMPUTE_TYPE = "int8"
 SUPPORTED_AUDIO_EXTENSIONS = {
     ".aac",
@@ -23,6 +26,25 @@ SUPPORTED_AUDIO_EXTENSIONS = {
     ".wav",
     ".wma",
 }
+GATED_HF_REPOS = {
+    "pyannote/speaker-diarization-3.1": "config.yaml",
+    "pyannote/segmentation-3.0": "config.yaml",
+}
+
+
+def check_hugging_face_access(hf_token):
+    for repo_id, filename in GATED_HF_REPOS.items():
+        try:
+            hf_hub_download(repo_id=repo_id, filename=filename, token=hf_token)
+        except HfHubHTTPError as exc:
+            raise RuntimeError(
+                "Hugging Face access check failed for "
+                f"https://huggingface.co/{repo_id}.\n\n"
+                "Make sure you accepted that model's user conditions while "
+                "signed into the same Hugging Face account that owns your "
+                "HF_TOKEN. If you use a fine-grained token, make sure this "
+                "repo is included in the token's allowed repositories."
+            ) from exc
 
 
 def format_timestamp(seconds, always_include_hours=False, decimal_marker="."):
@@ -63,6 +85,21 @@ def find_audio_files(input_dir):
         for path in input_dir.iterdir()
         if path.is_file() and path.suffix.lower() in SUPPORTED_AUDIO_EXTENSIONS
     )
+
+
+def output_audio_path(audio_path, output_dir):
+    return output_dir / audio_path.name
+
+
+def transcription_already_completed(audio_path, output_dir):
+    return output_audio_path(audio_path, output_dir).exists()
+
+
+def copy_source_audio(audio_path, output_dir):
+    destination = output_audio_path(audio_path, output_dir)
+    if not destination.exists():
+        shutil.copy2(audio_path, destination)
+    return destination
 
 
 def write_txt(segments, output_path):
@@ -143,17 +180,22 @@ def transcribe_audio(audio_path, output_dir, model, diarize_model, align_models)
     result = whisperx.assign_word_speakers(diarize_segments, result)
 
     write_outputs(result, audio_path, output_dir)
+    copied_audio_path = copy_source_audio(audio_path, output_dir)
 
     for segment in result["segments"]:
         print(speaker_text(segment))
 
     print(f"Saved output files to {output_dir}")
+    print(f"Copied source audio to {copied_audio_path}")
 
 
 def main():
     hf_token = os.getenv("HF_TOKEN")
-    if not hf_token:
-        raise RuntimeError("HF_TOKEN is not set. Export it before running transcribe.py.")
+    if not hf_token or hf_token == "hf_your_token_here":
+        raise RuntimeError(
+            "HF_TOKEN is not set. Add your Hugging Face token to .env before "
+            "running transcribe.py."
+        )
 
     INPUT_DIR.mkdir(exist_ok=True)
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -163,14 +205,29 @@ def main():
         print(f"No supported audio files found in {INPUT_DIR.resolve()}")
         return
 
+    check_hugging_face_access(hf_token)
+
     model = whisperx.load_model(MODEL_SIZE, DEVICE, compute_type=COMPUTE_TYPE)
-    diarize_model = whisperx.DiarizationPipeline(
-        use_auth_token=hf_token, device=DEVICE
-    )
+    try:
+        diarize_model = whisperx.DiarizationPipeline(
+            use_auth_token=hf_token, device=DEVICE
+        )
+    except AttributeError as exc:
+        raise RuntimeError(
+            "Could not load the Hugging Face diarization pipeline. Confirm your "
+            "HF_TOKEN has read access and that you accepted the user conditions "
+            "for https://huggingface.co/pyannote/speaker-diarization-3.1 and "
+            "https://huggingface.co/pyannote/segmentation-3.0"
+        ) from exc
+
     align_models = {}
 
     for audio_path in audio_files:
         file_output_dir = OUTPUT_DIR / audio_path.stem
+        if transcription_already_completed(audio_path, file_output_dir):
+            print(f"Skipping {audio_path}: source audio already exists in {file_output_dir}")
+            continue
+
         transcribe_audio(
             audio_path=audio_path,
             output_dir=file_output_dir,
