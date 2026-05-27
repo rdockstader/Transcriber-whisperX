@@ -46,6 +46,7 @@ python transcribe.py
 - Python 3.12
 - Homebrew
 - ffmpeg
+- pkg-config
 - Hugging Face account and access token
 - Access accepted for the required Hugging Face diarization models
 
@@ -67,10 +68,10 @@ Install Homebrew if needed:
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-Install Python 3.12 and ffmpeg:
+Install Python 3.12, ffmpeg, and pkg-config:
 
 ```bash
-brew install python@3.12 ffmpeg
+brew install python@3.12 ffmpeg pkg-config
 ```
 
 Create a virtual environment:
@@ -218,6 +219,21 @@ Confirm it is on your path:
 ```bash
 which ffmpeg
 ffmpeg -version
+```
+
+### PyAV requires pkg-config
+
+If installation fails while building `av` / `PyAV` with:
+
+```text
+pkg-config is required for building PyAV
+```
+
+Install `pkg-config` and make sure ffmpeg is installed:
+
+```bash
+brew install pkg-config ffmpeg
+python -m pip install -r requirements.txt
 ```
 
 ### Hugging Face gated repo access errors
